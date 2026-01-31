@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>dictate.sh — Editorial</title>
+    <title>dictate.sh — Local Real-time STT</title>
     <meta
       name="description"
-      content="Editorial landing page for dictate.sh: local ASR, VAD turns, and optional intent analysis."
+      content="dictate.sh: Real-time local speech-to-text on Apple Silicon using MLX. One-line setup, newest models, and instant processing."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Work+Sans:wght@300;400;500&family=Source+Code+Pro:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Work+Sans:wght@300;400;500;600&family=Source+Code+Pro:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <style>
@@ -85,7 +85,7 @@
       .hero {
         margin-top: 80px;
         text-align: center;
-        max-width: 700px;
+        max-width: 800px;
         margin-left: auto;
         margin-right: auto;
         border-top: none;
@@ -109,7 +109,7 @@
         font-size: 1.1rem;
         color: var(--muted);
         line-height: 1.7;
-        max-width: 540px;
+        max-width: 600px;
       }
 
       .btns {
@@ -164,6 +164,8 @@
         box-shadow: var(--shadow-lg);
         border: 1px solid rgba(255, 255, 255, 0.05);
         overflow: hidden;
+        max-width: 800px;
+        margin: 0 auto;
       }
 
       .terminal-header {
@@ -190,6 +192,7 @@
         box-shadow: none;
         border-radius: 0;
         padding: 14px 18px 18px;
+        text-align: left;
       }
 
       section {
@@ -198,17 +201,7 @@
         border-top: 1px solid var(--line);
       }
 
-      .section-title {
-        color: var(--accent);
-        text-transform: uppercase;
-        letter-spacing: 4px;
-        font-size: 0.72rem;
-        font-weight: 500;
-        display: inline-block;
-        padding: 6px 0;
-        border-bottom: 2px solid var(--accent);
-        margin-bottom: 8px;
-      }
+      /* Removed .section-title class as requested */
 
       h2 {
         font-family: "Playfair Display", serif;
@@ -287,20 +280,21 @@
         <div class="nav-links">
           <a href="#features">Features</a>
           <a href="#usage">Usage</a>
-          <a href="https://github.com/mpuig/dictate.sh">GitHub</a>
+          <a href="#models">Models</a>
+          <a href="https://github.com/mpuig/dictate.sh" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
       </nav>
 
       <section class="hero">
-        <h1>Local transcription with editorial clarity.</h1>
+        <h1>Local, real-time STT on Apple Silicon.</h1>
         <p>
-          dictate.sh keeps speech workflows on-device. MLX delivers low-latency
-          ASR, VAD finalizes turns, and a local LLM can extract intent when you
-          need structure.
+          Use speech models instantly with no complex setup.
+          Built on MLX for high-performance streaming and real-time processing entirely on-device.
+          <strong>100% Offline. No data leaves your machine.</strong>
         </p>
         <div class="btns">
           <a class="btn primary" href="#features">Features</a>
-          <a class="btn" href="https://github.com/mpuig/dictate.sh">View source</a>
+          <a class="btn" href="https://github.com/mpuig/dictate.sh" target="_blank" rel="noopener noreferrer">View source</a>
         </div>
       </section>
 
@@ -312,63 +306,91 @@
             <span class="terminal-dot green"></span>
           </div>
           <div class="terminal">
-            <span style="color: #6b7280;">$</span> uv run https://raw.githubusercontent.com/mpuig/dictate.sh/main/qwen3.py --analyze<br /><br />
-            <span style="color: #10b981;">INFO:</span> Ready<br />
-            <span style="color: #6b7280;">&gt;</span> Keep it on-device.<br />
-            <span style="color: #f59e0b;">Intent:</span> ACTION<br />
-            <span style="color: #f59e0b;">Entities:</span> "local inference"
+            <span style="color: #6b7280;">$</span> uv run https://raw.githubusercontent.com/mpuig/dictate.sh/main/stt.py<br /><br />
+            <span style="color: #10b981;">INFO:</span> Fetching dependencies...<br />
+            <span style="color: #10b981;">INFO:</span> Loading mlx-community/Qwen3-ASR-0.6B-8bit...<br />
+            <span style="color: #6b7280;">&gt;</span> "Running locally with no lag."<br />
+            <span style="color: #f59e0b;">Intent:</span> SYSTEM_CHECK<br />
           </div>
         </div>
       </div>
 
       <section id="features">
-        <div class="section-title">Features</div>
-        <h2>Everything you need, nothing you don't.</h2>
+        <!-- Removed Section Title -->
+        <h2>Performance meets simplicity.</h2>
         <div class="grid">
+          <!-- Removed "Newest Models" card -->
           <div class="card">
-            <h3>MLX ASR</h3>
-            <p>Fast, local transcription on Apple Silicon.</p>
+            <h3>One-Line Install</h3>
+            <p>Zero configuration. Just <code>uv run</code> and you are streaming in seconds.</p>
           </div>
           <div class="card">
-            <h3>VAD turns</h3>
-            <p>Finalize on silence, not arbitrary intervals.</p>
+            <h3>MLX Powered</h3>
+            <p>Optimized specifically for Apple Silicon hardware for maximum efficiency.</p>
           </div>
           <div class="card">
-            <h3>Intent analysis</h3>
-            <p>Optional on-device LLM for structure and routing.</p>
+            <h3>Real-Time Stream</h3>
+            <p>
+              Low-latency architecture lets you see words the moment they are spoken.
+              Uses a rolling-window buffer to prioritize speed.
+            </p>
           </div>
           <div class="card">
-            <h3>Clean output</h3>
-            <p>UI on stderr, stdout for scripting.</p>
+            <h3>Live Processing</h3>
+            <p>Analyze intent with models like Qwen3 on the fly as the audio streams.</p>
           </div>
         </div>
       </section>
 
       <section id="usage">
-        <div class="section-title">Usage</div>
-        <h2>Configuration options.</h2>
+        <h2>Advanced control.</h2>
+        <p style="color: var(--muted); margin-bottom: 32px; max-width: 700px;">
+          Swap out ASR or LLM models, fine-tune VAD sensitivity for noisy environments, 
+          select specific audio hardware, and pipe clean text output directly into other CLI tools.
+        </p>
+        <div class="terminal-window">
+          <div class="terminal-header">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+          </div>
+          <div class="terminal">
+            <span style="color: #6b7280;"># Use a specific input device</span><br />
+            <span style="color: #6b7280;">$</span> uv run stt.py --list-devices<br />
+            <span style="color: #6b7280;">$</span> uv run stt.py --device 1<br /><br />
+            <span style="color: #6b7280;"># Switch models (ASR & LLM)</span><br />
+            <span style="color: #6b7280;">$</span> uv run stt.py --model mlx-community/Qwen3-ASR-1.7B-8bit<br />
+            <span style="color: #6b7280;">$</span> uv run stt.py --analyze --llm-model mlx-community/Mistral-7B-Instruct-v0.2-4bit<br /><br />
+            <span style="color: #6b7280;"># Tune latency & VAD</span><br />
+            <span style="color: #6b7280;">$</span> uv run stt.py --transcribe-interval 0.2 --vad-silence-ms 300
+          </div>
+        </div>
+      </section>
+
+      <section id="models">
+        <h2>Models.</h2>
         <div class="grid">
           <div class="card">
-            <div class="terminal">
-              $ uv run qwen3.py<br /><br />
-              $ uv run qwen3.py --analyze<br /><br />
-              $ uv run qwen3.py --model mlx-community/Qwen3-ASR-1.7B-8bit<br /><br />
-              $ uv run qwen3.py --vad-mode 0 --vad-silence-ms 1200 --min-words 6
-            </div>
-          </div>
-          <div class="card">
-            <h3>Dial in the feel</h3>
-            <p>
-              Increase <strong>--vad-silence-ms</strong> to avoid short turns or
-              lower <strong>--vad-mode</strong> for less aggressive detection.
+            <h3>Qwen3-ASR</h3>
+            <p style="margin-bottom: 12px;">
+              The current default. Supports robust speech recognition across 52 languages and dialects.
+              Built on the Qwen3-Omni foundation, it delivers high accuracy in complex acoustic environments.
             </p>
+            <a href="https://huggingface.co/Qwen/Qwen3-ASR-0.6B" style="color: var(--accent); font-size: 0.85rem; font-weight: 500; text-decoration: underline;" target="_blank" rel="noopener noreferrer">Hugging Face →</a>
           </div>
         </div>
       </section>
 
       <footer>
-        <span>dictate.sh · MIT</span>
-        <span>Apple Silicon only</span>
+        <span>dictate.sh · Marc Puig</span>
+        <div style="display: flex; gap: 16px; align-items: center;">
+          <a href="https://x.com/mpuig" aria-label="X (Twitter)" style="transition: opacity 0.2s ease; display: flex;" target="_blank" rel="noopener noreferrer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <a href="https://github.com/mpuig" aria-label="GitHub" style="transition: opacity 0.2s ease; display: flex;" target="_blank" rel="noopener noreferrer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.419 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"/></svg>
+          </a>
+        </div>
       </footer>
     </div>
   </body>

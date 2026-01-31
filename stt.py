@@ -30,10 +30,10 @@ Troubleshooting:
     - If output feels laggy: reduce --transcribe-interval.
 
 Usage:
-    uv run qwen3.py
-    uv run qwen3.py --model mlx-community/Qwen3-ASR-1.7B-8bit
-    uv run qwen3.py --analyze  # opt-in if you want intent analysis
-    uv run qwen3.py --vad-mode 3 --vad-silence-ms 700
+    uv run stt.py
+    uv run stt.py --model mlx-community/Qwen3-ASR-1.7B-8bit
+    uv run stt.py --analyze  # opt-in if you want intent analysis
+    uv run stt.py --vad-mode 3 --vad-silence-ms 700
 
 Models (MLX Qwen3-ASR):
     - mlx-community/Qwen3-ASR-0.6B-4bit: fastest, lowest quality.
@@ -998,6 +998,7 @@ class RealtimeTranscriber:
         analyze: bool = False,
         llm_model: Optional[str] = None,
         device: Optional[int] = None,
+        no_ui: bool = False,
     ):
         self.model_path = model_path
         self.language = language
@@ -1009,6 +1010,7 @@ class RealtimeTranscriber:
         self.analyze = analyze
         self.llm_model_name = llm_model or DEFAULT_LLM_MODEL
         self.device = device
+        self.no_ui = no_ui
 
         self.sample_rate = DEFAULT_SAMPLE_RATE
         # Bound RAM and latency by limiting the rolling window.
@@ -1381,6 +1383,7 @@ class RealtimeTranscriber:
     async def _display(self):
         """Keep UI responsive without blocking the ASR pipeline."""
         last_displayed = ""
+        is_tty = sys.stdout.isatty()
 
         while True:
             await asyncio.sleep(0.1)
@@ -1394,25 +1397,30 @@ class RealtimeTranscriber:
                 self._update_ui(force=True)
 
                 if not self.live:
-                    sys.stdout.write("\r\033[K")
-                    self.console_out.print(f"[bold green]>[/bold green] {transcript}")
-                    if analysis:
-                        if analysis["intent"] or analysis["action"]:
-                            self.console_out.print(
-                                f"  [cyan]Intent:[/cyan] {analysis['intent']}"
-                            )
-                            if (
-                                analysis["entities"]
-                                and analysis["entities"].lower() != "none"
-                            ):
+                    if is_tty:
+                        sys.stdout.write("\r\033[K")
+                        self.console_out.print(f"[bold green]>[/bold green] {transcript}")
+                        if analysis:
+                            if analysis["intent"] or analysis["action"]:
                                 self.console_out.print(
-                                    f"  [cyan]Entities:[/cyan] {analysis['entities']}"
+                                    f"  [cyan]Intent:[/cyan] {analysis['intent']}"
                                 )
-                            if analysis["action"]:
-                                self.console_out.print(
-                                    f"  [cyan]Action:[/cyan] {analysis['action']}"
-                                )
-                        self.console_out.print()
+                                if (
+                                    analysis["entities"]
+                                    and analysis["entities"].lower() != "none"
+                                ):
+                                    self.console_out.print(
+                                        f"  [cyan]Entities:[/cyan] {analysis['entities']}"
+                                    )
+                                if analysis["action"]:
+                                    self.console_out.print(
+                                        f"  [cyan]Action:[/cyan] {analysis['action']}"
+                                    )
+                            self.console_out.print()
+                    else:
+                        # Clean output for piping
+                        sys.stdout.write(f"{transcript}\n")
+                        sys.stdout.flush()
 
                 last_displayed = ""
                 continue
@@ -1421,14 +1429,15 @@ class RealtimeTranscriber:
                 if self.current_transcript != last_displayed and not self.turn_complete:
                     self.ui_partial = self.current_transcript
                     if not self.live:
-                        width = shutil.get_terminal_size(fallback=(80, 20)).columns - 5
-                        width = max(width, 10)
-                        display_text = self.current_transcript
-                        if len(display_text) > width:
-                            display_text = "..." + display_text[-(width - 3) :]
+                        if is_tty:
+                            width = shutil.get_terminal_size(fallback=(80, 20)).columns - 5
+                            width = max(width, 10)
+                            display_text = self.current_transcript
+                            if len(display_text) > width:
+                                display_text = "..." + display_text[-(width - 3) :]
 
-                        sys.stdout.write(f"\r\033[K  \033[2m{display_text}\033[0m")
-                        sys.stdout.flush()
+                            sys.stdout.write(f"\r\033[K  \033[2m{display_text}\033[0m")
+                            sys.stdout.flush()
                     last_displayed = self.current_transcript
 
             if self.live:
@@ -1437,13 +1446,14 @@ class RealtimeTranscriber:
     async def run(self):
         """Wire models, stream, and tasks, then manage their lifecycle."""
         self.loop = asyncio.get_running_loop()
-        self.live = Live(
-            self._render_ui(),
-            console=self.console_ui,
-            refresh_per_second=10,
-            transient=False,
-        )
-        self.live.start()
+        if not self.no_ui:
+            self.live = Live(
+                self._render_ui(),
+                console=self.console_ui,
+                refresh_per_second=10,
+                transient=False,
+            )
+            self.live.start()
 
         self.ui_status = "Loading ASR model..."
         self._update_ui(force=True)
@@ -1608,6 +1618,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--llm-model", default=None, help="LLM model for analysis")
     parser.add_argument(
+        "--no-ui", action="store_true", help="Disable the Rich live UI"
+    )
+    parser.add_argument(
         "--list-devices", action="store_true", help="List audio devices"
     )
     parser.add_argument("--device", type=int, default=None, help="Audio input device")
@@ -1664,6 +1677,7 @@ def main() -> int:
         analyze=args.analyze,
         llm_model=args.llm_model,
         device=args.device,
+        no_ui=args.no_ui,
     )
 
     asyncio.run(transcriber.run())

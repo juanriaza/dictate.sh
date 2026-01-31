@@ -24,31 +24,31 @@ so you can run it with `uv` and start talking.
 ## Quick start
 
 ```bash
-uv run qwen3.py
+uv run stt.py
 ```
 
 With intent analysis:
 
 ```bash
-uv run qwen3.py --analyze
+uv run stt.py --analyze
 ```
 
 Choose a different ASR model:
 
 ```bash
-uv run qwen3.py --model mlx-community/Qwen3-ASR-1.7B-8bit
+uv run stt.py --model mlx-community/Qwen3-ASR-1.7B-8bit
 ```
 
 List audio input devices:
 
 ```bash
-uv run qwen3.py --list-devices
+uv run stt.py --list-devices
 ```
 
 Use a specific input device:
 
 ```bash
-uv run qwen3.py --device 3
+uv run stt.py --device 3
 ```
 
 ## CLI options
@@ -62,6 +62,7 @@ uv run qwen3.py --device 3
 - `--min-words`: Minimum words to finalize a turn (default: `3`)
 - `--analyze`: Enable LLM intent analysis
 - `--llm-model`: LLM model to use for analysis (default: `mlx-community/Qwen3-0.6B-4bit`)
+- `--no-ui`: Disable the Rich live UI
 - `--list-devices`: List audio input devices
 - `--device`: Audio input device index
 
@@ -81,10 +82,16 @@ LLM (for `--analyze`):
 - `mlx-community/Mistral-7B-Instruct-v0.2-4bit`: heavier
 - `mlx-community/Llama-3.1-8B-Instruct-4bit`: heavier
 
-## UI notes
+## UI and Piping
 
-- The Rich live UI renders on stderr to keep stdout clean for scripting.
-- If you want a plain, stdout-only mode, ask and I can add a `--no-ui` flag.
+- The Rich live UI renders on `stderr` to keep `stdout` clean for scripting.
+- If `stdout` is not a TTY (e.g., when piping to another tool), `stt.py` automatically suppresses the UI elements and prints raw transcript lines to `stdout`.
+- Use `--no-ui` to force-disable the visual interface even in a TTY.
+
+```bash
+# Pipe raw transcripts into another tool
+uv run stt.py | grep "important"
+```
 
 ## Troubleshooting
 
