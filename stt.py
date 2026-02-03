@@ -10,6 +10,8 @@
 #     "huggingface_hub",
 #     "webrtcvad",
 #     "rich",
+#     "librosa",
+#     "soundfile",
 # ]
 # ///
 """
@@ -1570,6 +1572,205 @@ class RealtimeTranscriber:
 # =============================================================================
 
 
+class FileTranscriber:
+    """Batch processes an audio file using the same VAD and ASR pipeline."""
+
+    def __init__(
+        self,
+        model_path: str = DEFAULT_ASR_MODEL,
+        language: str = DEFAULT_LANGUAGE,
+        vad_frame_ms: int = DEFAULT_VAD_FRAME_MS,
+        vad_mode: int = DEFAULT_VAD_MODE,
+        vad_silence_ms: int = DEFAULT_VAD_SILENCE_MS,
+        min_words: int = DEFAULT_MIN_WORDS,
+        analyze: bool = False,
+        llm_model: Optional[str] = None,
+        file_path: str = "",
+    ):
+        self.model_path = model_path
+        self.language = language
+        self.vad_frame_ms = vad_frame_ms
+        self.vad_mode = vad_mode
+        self.vad_silence_ms = vad_silence_ms
+        self.min_words = min_words
+        self.analyze = analyze
+        self.llm_model_name = llm_model or DEFAULT_LLM_MODEL
+        self.file_path = file_path
+        self.sample_rate = DEFAULT_SAMPLE_RATE
+
+        self.model = None
+        self.tokenizer = None
+        self.feature_extractor = None
+        self.llm = None
+        self.llm_tokenizer = None
+
+    def _analyze_intent(self, text: str) -> Dict[str, str]:
+        """Normalize intent output into stable fields for display."""
+        from mlx_lm.generate import generate
+
+        messages = [
+            {"role": "user", "content": INTENT_EXPLAIN_PROMPT.format(text=text)}
+        ]
+        prompt = self.llm_tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        with _suppress_output():
+            response = generate(
+                self.llm, self.llm_tokenizer, prompt, max_tokens=100, verbose=False
+            )
+
+        # Keep output clean; some models emit reasoning tags.
+        response = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL)
+        response = response.strip()
+
+        # Normalize into stable fields for display.
+        result = {"intent": "", "entities": "", "action": ""}
+        for line in response.split("\n"):
+            line = line.strip()
+            if line.upper().startswith("INTENT:"):
+                result["intent"] = line[7:].strip()
+            elif line.upper().startswith("ENTITIES:"):
+                result["entities"] = line[9:].strip()
+            elif line.upper().startswith("ACTION:"):
+                result["action"] = line[7:].strip()
+
+        return result
+
+    def _process_turn(self, buffer: List[np.ndarray]) -> None:
+        if not buffer:
+            return
+        turn_audio = np.concatenate(buffer)
+
+        # Transcribe
+        parts = []
+        with _suppress_output():
+            for token in transcribe(
+                self.model,
+                self.tokenizer,
+                self.feature_extractor,
+                turn_audio,
+                self.language,
+            ):
+                parts.append(token)
+        text = "".join(parts).strip()
+
+        # Normalize for a minimal-content check.
+        cleaned = re.sub(r"[^\w]", "", text)
+        if len(cleaned) < 2:  # Avoid short spurious bursts.
+            return
+        if len(text.split()) < self.min_words:
+            return
+
+        print(f"> {text}")
+
+        if self.analyze:
+            analysis = self._analyze_intent(text)
+            if analysis["intent"]:
+                print(f"  Intent: {analysis['intent']}")
+            if analysis["entities"] and analysis["entities"].lower() != "none":
+                print(f"  Entities: {analysis['entities']}")
+            if analysis["action"]:
+                print(f"  Action: {analysis['action']}")
+        print()
+
+    def run(self):
+        """Load components and process the file."""
+        try:
+            import librosa
+        except ImportError:
+            LOGGER.error("Please install librosa: uv pip install librosa soundfile")
+            return
+
+        print(f"Loading audio file: {self.file_path}")
+        # librosa.load resamples if sr is provided.
+        # It returns audio as float32 in [-1, 1].
+        try:
+            audio, _ = librosa.load(self.file_path, sr=self.sample_rate)
+        except Exception as e:
+            LOGGER.error(f"Failed to load audio file: {e}")
+            return
+
+        print(f"Loading ASR model: {self.model_path}")
+        self.model, self.tokenizer, self.feature_extractor = load_qwen3_asr(
+            self.model_path
+        )
+
+        if self.analyze:
+            print(f"Loading LLM: {self.llm_model_name}")
+            from mlx_lm.utils import load as load_llm
+
+            self.llm, self.llm_tokenizer = load_llm(self.llm_model_name)
+
+        print("Processing...")
+
+        # VAD Setup
+        vad = webrtcvad.Vad(self.vad_mode)
+        frame_samples = int(self.sample_rate * self.vad_frame_ms / 1000)
+        silence_frames = int(math.ceil(self.vad_silence_ms / self.vad_frame_ms))
+
+        # Pre-roll config (e.g., 0.5s) to capture start of speech
+        preroll_duration_ms = 500
+        preroll_frames = int(math.ceil(preroll_duration_ms / self.vad_frame_ms))
+
+        from collections import deque
+
+        # Ring buffer for pre-roll silence
+        preroll_buffer = deque(maxlen=preroll_frames)
+
+        # We need int16 for VAD
+        audio_int16 = (audio * 32768).astype(np.int16)
+
+        speech_detected = False
+        silence_count = 0
+        buffer = []  # Active speech buffer
+
+        for i in range(0, len(audio_int16), frame_samples):
+            chunk = audio_int16[i : i + frame_samples]
+            if len(chunk) < frame_samples:
+                # Pad with silence to match VAD frame size
+                chunk = np.pad(chunk, (0, frame_samples - len(chunk)), "constant")
+
+            # Reconstruct float chunk for transcription corresponding to this frame
+            chunk_float = audio[i : i + frame_samples]
+            if len(chunk_float) < frame_samples:
+                chunk_float = np.pad(
+                    chunk_float, (0, frame_samples - len(chunk_float)), "constant"
+                )
+
+            is_speech = vad.is_speech(chunk.tobytes(), self.sample_rate)
+
+            if is_speech:
+                if not speech_detected:
+                    # Speech started: prepend pre-roll
+                    buffer = list(preroll_buffer)
+                    speech_detected = True
+                    silence_count = 0
+
+                buffer.append(chunk_float)
+                silence_count = 0
+
+            elif speech_detected:
+                # In speech turn, but current frame is silence
+                buffer.append(chunk_float)
+                silence_count += 1
+                if silence_count >= silence_frames:
+                    # Turn complete
+                    self._process_turn(buffer)
+                    buffer = []
+                    speech_detected = False
+                    silence_count = 0
+                    preroll_buffer.clear()
+            else:
+                # Silence state: maintain pre-roll
+                preroll_buffer.append(chunk_float)
+
+        # Process any remaining audio if speech was active
+        if buffer and speech_detected:
+            self._process_turn(buffer)
+
+        print("Done.")
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     """Separate CLI configuration for reuse and testability."""
     parser = argparse.ArgumentParser(
@@ -1621,6 +1822,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--list-devices", action="store_true", help="List audio devices"
     )
     parser.add_argument("--device", type=int, default=None, help="Audio input device")
+    parser.add_argument("--file", type=str, default=None, help="Audio file to transcribe")
     return parser
 
 
@@ -1661,6 +1863,21 @@ def main() -> int:
 
     if args.list_devices:
         list_audio_devices()
+        return 0
+
+    if args.file:
+        transcriber = FileTranscriber(
+            model_path=args.model,
+            language=args.language,
+            vad_frame_ms=args.vad_frame_ms,
+            vad_mode=args.vad_mode,
+            vad_silence_ms=args.vad_silence_ms,
+            min_words=args.min_words,
+            analyze=args.analyze,
+            llm_model=args.llm_model,
+            file_path=args.file,
+        )
+        transcriber.run()
         return 0
 
     transcriber = RealtimeTranscriber(
